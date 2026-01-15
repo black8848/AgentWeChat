@@ -74,6 +74,18 @@ class WeChatMonitor:
         print("[WeChat] 未找到微信窗口")
         return False
 
+    def mark_existing_messages_as_read(self) -> int:
+        """标记当前所有消息为已处理，返回标记数量"""
+        messages = self.get_messages()
+        count = 0
+        for msg in messages:
+            if not msg.is_self:
+                msg_id = self._make_message_id(msg.text)
+                if not self._processed_messages.contains(msg_id):
+                    self._processed_messages.add(msg_id)
+                    count += 1
+        return count
+
     def _calculate_chat_region(self):
         """计算聊天消息区域（排除左侧列表和底部输入框）"""
         if not self._window:

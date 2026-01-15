@@ -41,6 +41,11 @@ def main():
         print("[Error] 请先打开微信客户端")
         sys.exit(1)
 
+    # 标记现有消息为已读，只响应启动后的新消息
+    print("[System] 正在扫描现有消息...")
+    marked_count = monitor.mark_existing_messages_as_read()
+    print(f"[System] 已忽略 {marked_count} 条现有消息")
+
     # 设置退出信号处理
     running = True
 
