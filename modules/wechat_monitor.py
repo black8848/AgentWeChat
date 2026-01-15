@@ -57,6 +57,10 @@ class WeChatMonitor:
         self._window = None
         self._chat_region = None  # 聊天区域坐标
         self._last_messages: list[str] = []
+        # 防止回复自己消息的机制
+        self._recent_sent_texts: list[str] = []  # 最近发送的消息
+        self._last_send_time: float = 0  # 上次发送时间
+        self._send_cooldown: float = 5.0  # 发送后冷却时间(秒)
 
     def find_wechat_window(self) -> bool:
         windows = gw.getWindowsWithTitle("微信")
@@ -171,10 +175,29 @@ class WeChatMonitor:
         raw = f"{content}:{timestamp_minute}"
         return hashlib.md5(raw.encode()).hexdigest()
 
+    def _is_own_message(self, text: str) -> bool:
+        """检查消息是否是自己发送的（防止回复自己的多行消息）"""
+        for sent_text in self._recent_sent_texts:
+            # 检查是否是发送消息的一部分
+            if text in sent_text or sent_text in text:
+                return True
+            # 检查相似度（简单的子串匹配）
+            if len(text) > 3 and text in sent_text:
+                return True
+        return False
+
     def check_new_message(self) -> str | None:
         """检查是否有新消息，返回新消息内容"""
+        # 冷却时间内不检测
+        if time.time() - self._last_send_time < self._send_cooldown:
+            return None
+
         msg = self.get_last_received_message()
         if not msg:
+            return None
+
+        # 过滤自己发送的消息
+        if self._is_own_message(msg):
             return None
 
         msg_id = self._make_message_id(msg)
@@ -201,8 +224,6 @@ class WeChatMonitor:
             pyautogui.click(input_x, input_y)
             time.sleep(0.1)
 
-            # 输入文字
-            pyautogui.typewrite(text, interval=0.02) if text.isascii() else None
             # 中文需要用剪贴板
             import pyperclip
             pyperclip.copy(text)
@@ -212,6 +233,14 @@ class WeChatMonitor:
             # 发送
             pyautogui.press("enter")
             print(f"[WeChat] 已发送: {text[:30]}...")
+
+            # 记录发送的消息和时间
+            self._recent_sent_texts.append(text)
+            # 只保留最近5条
+            if len(self._recent_sent_texts) > 5:
+                self._recent_sent_texts.pop(0)
+            self._last_send_time = time.time()
+
             return True
 
         except Exception as e:
