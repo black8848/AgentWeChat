@@ -2,8 +2,7 @@ import time
 import hashlib
 from collections import OrderedDict
 
-import uiautomation as auto
-import pyperclip
+from wxauto import WeChat
 
 
 class LRUCache:
@@ -29,72 +28,46 @@ class LRUCache:
 class WeChatMonitor:
     def __init__(self):
         self._processed_messages = LRUCache(1000)
-        self._wechat_window: auto.WindowControl | None = None
-        self._last_message_count = 0
+        self._wx: WeChat | None = None
+        self._current_chat: str | None = None
 
     def find_wechat_window(self) -> bool:
-        # 尝试多种方式查找微信窗口
-        search_methods = [
-            ("ClassName", {"searchDepth": 1, "ClassName": "WeChatMainWndForPC"}),
-            ("ClassName2", {"searchDepth": 1, "ClassName": "WeChat"}),
-            ("Name", {"searchDepth": 1, "Name": "微信"}),
-        ]
-
-        for method_name, kwargs in search_methods:
-            try:
-                window = auto.WindowControl(**kwargs)
-                if window.Exists(0.5, 0.5):
-                    self._wechat_window = window
-                    print(f"[WeChat] 找到微信窗口 (via {method_name})")
-                    print(f"[WeChat] ClassName: {window.ClassName}")
-                    print(f"[WeChat] Name: {window.Name}")
-                    return True
-            except Exception as e:
-                print(f"[WeChat] 方法 {method_name} 失败: {e}")
-                continue
-
-        print("[WeChat] 未找到微信窗口")
-        print("[WeChat] 请运行 debug_wechat.py 查看实际窗口信息")
-        return False
+        try:
+            self._wx = WeChat()
+            print(f"[WeChat] 已连接微信")
+            return True
+        except Exception as e:
+            print(f"[WeChat] 连接微信失败: {e}")
+            return False
 
     def get_current_chat_name(self) -> str | None:
-        if not self._wechat_window:
+        if not self._wx:
             return None
         try:
-            # 聊天标题栏
-            title = self._wechat_window.TextControl(searchDepth=10)
-            if title.Exists(0, 0):
-                return title.Name
+            return self._wx.CurrentChat()
         except Exception:
-            pass
-        return None
+            return None
 
-    def get_messages(self) -> list[tuple[str, str]]:
-        if not self._wechat_window:
+    def get_messages(self, count: int = 5) -> list[tuple[str, str]]:
+        if not self._wx:
             return []
 
         messages: list[tuple[str, str]] = []
         try:
-            # 定位消息列表控件
-            msg_list = self._wechat_window.ListControl(Name="消息")
-            if not msg_list.Exists(0, 0):
+            # 获取最近的消息
+            msg_list = self._wx.GetAllMessage()
+            if not msg_list:
                 return []
 
-            items = msg_list.GetChildren()
-            for item in items:
-                try:
-                    name = item.Name or ""
-                    # 获取消息文本内容
-                    texts = item.GetChildren()
-                    content = ""
-                    for t in texts:
-                        if t.Name:
-                            content = t.Name
-                            break
-                    if content:
-                        messages.append((name, content))
-                except Exception:
-                    continue
+            # 取最后count条
+            for msg in msg_list[-count:]:
+                sender = getattr(msg, "sender", "") or ""
+                content = getattr(msg, "content", "") or ""
+                msg_type = getattr(msg, "type", "")
+
+                # 只处理文本消息
+                if msg_type == "friend" and content:
+                    messages.append((sender, content))
 
         except Exception as e:
             print(f"[WeChat] 获取消息失败: {e}")
@@ -102,15 +75,14 @@ class WeChatMonitor:
         return messages
 
     def get_last_received_message(self) -> tuple[str, str] | None:
-        messages = self.get_messages()
+        messages = self.get_messages(5)
         if not messages:
             return None
 
-        # 返回最后一条消息（假设是对方发的）
-        # 简单判断：如果消息名称不为空，认为是对方发的
-        for name, content in reversed(messages):
-            if name and content:
-                return (name, content)
+        # 返回最后一条非自己发送的消息
+        for sender, content in reversed(messages):
+            if sender and content:
+                return (sender, content)
         return None
 
     def _make_message_id(self, sender: str, content: str) -> str:
@@ -133,30 +105,13 @@ class WeChatMonitor:
         return (sender, content)
 
     def send_message(self, text: str) -> bool:
-        if not self._wechat_window:
+        if not self._wx:
             return False
 
         try:
-            # 定位输入框
-            edit = self._wechat_window.EditControl(Name="输入")
-            if not edit.Exists(0, 0):
-                print("[WeChat] 未找到输入框")
-                return False
-
-            # 点击输入框激活
-            edit.Click()
-            time.sleep(0.1)
-
-            # 使用剪贴板粘贴内容
-            pyperclip.copy(text)
-            edit.SendKeys("{Ctrl}v")
-            time.sleep(0.1)
-
-            # 发送
-            edit.SendKeys("{Enter}")
+            self._wx.SendMsg(text)
             print(f"[WeChat] 已发送: {text[:50]}...")
             return True
-
         except Exception as e:
             print(f"[WeChat] 发送失败: {e}")
             return False
