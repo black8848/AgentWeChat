@@ -1,3 +1,6 @@
-wxauto>=4.0.0
+mss
+pyautogui
+pygetwindow
+requests
 pyyaml>=6.0
 openai>=1.0.0
