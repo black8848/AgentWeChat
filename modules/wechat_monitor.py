@@ -2,7 +2,7 @@ import time
 import hashlib
 from collections import OrderedDict
 
-from wxauto import WeChat
+from wxauto4 import WeChat
 
 
 class LRUCache:
