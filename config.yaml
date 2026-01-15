@@ -1,0 +1,19 @@
+# API配置
+api:
+  provider: "deepseek"
+  api_key: ""  # 优先使用环境变量 DEEPSEEK_API_KEY
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-chat"
+
+# 回复风格配置
+style:
+  default: "阴阳怪气"
+  # 可选: 阴阳怪气, 专业严肃, 幽默搞笑, 温柔体贴
+  # 或者使用自定义提示词:
+  custom_prompt: ""
+
+# 监控配置
+monitor:
+  check_interval: 2  # 检查间隔(秒)
+  reply_delay_min: 1  # 回复延迟最小值(秒)
+  reply_delay_max: 3  # 回复延迟最大值(秒)
