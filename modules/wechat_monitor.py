@@ -33,18 +33,29 @@ class WeChatMonitor:
         self._last_message_count = 0
 
     def find_wechat_window(self) -> bool:
-        try:
-            self._wechat_window = auto.WindowControl(
-                searchDepth=1, ClassName="WeChatMainWndForPC"
-            )
-            if self._wechat_window.Exists(0, 0):
-                print(f"[WeChat] 找到微信窗口")
-                return True
-            print("[WeChat] 未找到微信窗口")
-            return False
-        except Exception as e:
-            print(f"[WeChat] 查找窗口失败: {e}")
-            return False
+        # 尝试多种方式查找微信窗口
+        search_methods = [
+            ("ClassName", {"searchDepth": 1, "ClassName": "WeChatMainWndForPC"}),
+            ("ClassName2", {"searchDepth": 1, "ClassName": "WeChat"}),
+            ("Name", {"searchDepth": 1, "Name": "微信"}),
+        ]
+
+        for method_name, kwargs in search_methods:
+            try:
+                window = auto.WindowControl(**kwargs)
+                if window.Exists(0.5, 0.5):
+                    self._wechat_window = window
+                    print(f"[WeChat] 找到微信窗口 (via {method_name})")
+                    print(f"[WeChat] ClassName: {window.ClassName}")
+                    print(f"[WeChat] Name: {window.Name}")
+                    return True
+            except Exception as e:
+                print(f"[WeChat] 方法 {method_name} 失败: {e}")
+                continue
+
+        print("[WeChat] 未找到微信窗口")
+        print("[WeChat] 请运行 debug_wechat.py 查看实际窗口信息")
+        return False
 
     def get_current_chat_name(self) -> str | None:
         if not self._wechat_window:
