@@ -3,7 +3,10 @@ import time
 import random
 import signal
 
-from modules import load_config, AIClient, WeChatMonitor
+from modules.config_loader import load_config
+from modules.ai_client import AIClient
+from modules.baidu_ocr import BaiduOCR
+from modules.wechat_monitor import WeChatMonitor
 
 
 def main():
@@ -13,7 +16,7 @@ def main():
     try:
         config = load_config()
         print(f"[Config] 已加载配置")
-        print(f"[Config] API: {config.api.provider}")
+        print(f"[Config] AI: {config.api.provider}")
         print(f"[Config] 风格: {config.style.default}")
     except Exception as e:
         print(f"[Error] 配置加载失败: {e}")
@@ -21,12 +24,17 @@ def main():
 
     # 检查API Key
     if not config.api.api_key:
-        print("[Error] 未设置API Key，请设置环境变量 DEEPSEEK_API_KEY 或在 config.yaml 中配置")
+        print("[Error] 未设置AI API Key")
+        sys.exit(1)
+
+    if not config.baidu_ocr.api_key or not config.baidu_ocr.secret_key:
+        print("[Error] 未设置百度OCR API Key")
         sys.exit(1)
 
     # 初始化模块
     ai_client = AIClient(config.api)
-    monitor = WeChatMonitor()
+    ocr = BaiduOCR(config.baidu_ocr.api_key, config.baidu_ocr.secret_key)
+    monitor = WeChatMonitor(ocr)
 
     # 查找微信窗口
     if not monitor.find_wechat_window():
@@ -53,12 +61,11 @@ def main():
             new_msg = monitor.check_new_message()
 
             if new_msg:
-                sender, content = new_msg
-                print(f"\n[收到] {sender}: {content}")
+                print(f"\n[收到] {new_msg}")
 
                 # 生成回复
                 reply = ai_client.generate_reply(
-                    content,
+                    new_msg,
                     config.style.default,
                     config.style.custom_prompt,
                 )

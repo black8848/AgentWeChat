@@ -14,6 +14,12 @@ class ApiConfig:
 
 
 @dataclass
+class BaiduOcrConfig:
+    api_key: str
+    secret_key: str
+
+
+@dataclass
 class StyleConfig:
     default: str
     custom_prompt: str
@@ -29,6 +35,7 @@ class MonitorConfig:
 @dataclass
 class Config:
     api: ApiConfig
+    baidu_ocr: BaiduOcrConfig
     style: StyleConfig
     monitor: MonitorConfig
 
@@ -50,6 +57,12 @@ def load_config(config_path: str | None = None) -> Config:
         model=api_data.get("model", "deepseek-chat"),
     )
 
+    ocr_data = data.get("baidu_ocr", {})
+    baidu_ocr_config = BaiduOcrConfig(
+        api_key=os.environ.get("BAIDU_OCR_API_KEY") or ocr_data.get("api_key", ""),
+        secret_key=os.environ.get("BAIDU_OCR_SECRET_KEY") or ocr_data.get("secret_key", ""),
+    )
+
     style_data = data.get("style", {})
     style_config = StyleConfig(
         default=style_data.get("default", "阴阳怪气"),
@@ -63,4 +76,9 @@ def load_config(config_path: str | None = None) -> Config:
         reply_delay_max=monitor_data.get("reply_delay_max", 3),
     )
 
-    return Config(api=api_config, style=style_config, monitor=monitor_config)
+    return Config(
+        api=api_config,
+        baidu_ocr=baidu_ocr_config,
+        style=style_config,
+        monitor=monitor_config,
+    )
